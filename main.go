@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 )
 
 var changelogExecutable string = "changelog-gen"
@@ -37,31 +38,40 @@ func main() {
 
 	// Validate inputs where possible
 
+	validationErrs := []error{} // Collect errors and report them all later
 	err := assertPathExists(mmRepoPath)
 	if err != nil {
-		log.Fatal(err)
+		validationErrs = append(validationErrs, err)
 	}
 
-	err = validateVersionInputs(releaseVersion, previousReleaseVersion)
-	if err != nil {
-		log.Fatal(err)
+	errs := validateVersionInputs(releaseVersion, previousReleaseVersion)
+	if len(errs) != 0 {
+		validationErrs = append(validationErrs, errs...)
 	}
 
 	if ga && beta {
-		log.Fatal("you should provide only one of the -ga and -beta flags")
+		validationErrs = append(validationErrs, fmt.Errorf("you should provide only one of the -ga and -beta flags"))
 	}
 	if !ga && !beta {
-		log.Fatal("you need to provide at least one of the -ga and -beta flags")
+		validationErrs = append(validationErrs, fmt.Errorf("you need to provide at least one of the -ga and -beta flags"))
 	}
 
 	if commitSha == "" {
-		log.Fatal("you need to provide a commit SHA to be the basis of the new release")
+		validationErrs = append(validationErrs, fmt.Errorf("you need to provide a commit SHA to be the basis of the new release"))
 	}
 
 	// Make sure dependencies present
 	_, err = exec.LookPath(changelogExecutable)
 	if err != nil {
-		log.Fatal("you need to have changelog-gen in your PATH to use this CLI. Ensure it is in your PATH or download it via: go install github.com/paultyng/changelog-gen@master")
+		validationErrs = append(validationErrs, fmt.Errorf("you need to have changelog-gen in your PATH to use this CLI. Ensure it is in your PATH or download it via: go install github.com/paultyng/changelog-gen@master"))
+	}
+
+	if len(validationErrs) > 0 {
+		fmt.Println("There were some problems with inputs to the command:")
+		for _, e := range validationErrs {
+			fmt.Printf("\t> %v\n", e)
+		}
+		os.Exit(1)
 	}
 
 	// Prepare
@@ -126,28 +136,54 @@ func assertPathExists(path string) error {
 	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("cannot find %s, is the path correct?", path)
+			return fmt.Errorf("cannot find anything at the path '%s', is the path correct?", path)
 		}
 		return fmt.Errorf("unexpected error when locating %s", path)
 	}
 	return nil
 }
 
-func validateVersionInputs(new, old string) error {
+func validateVersionInputs(new, old string) []error {
+
+	validationErrs := []error{}
+	// Assert provided
+	if new == "" || old == "" {
+		validationErrs = append(validationErrs, fmt.Errorf("make sure to provide values for both release_version and previous_release_version flags"))
+	}
 
 	// Assert inputs are valid format
 	err := checkSemVer(new, old)
 	if err != nil {
-		return err
+		validationErrs = append(validationErrs, err)
 	}
 
-	// TODO - fix, this regards 0.0.10 as less than 0.0.9
-	// Assert new is a later version than old
-	// if old > new || old == new {
-	// 	return fmt.Errorf("the version we're preparing (%s) should be a more recent version number than the provided previous version number (%s)", new, old)
-	// }
+	// Assert not the same
+	if new == old {
+		validationErrs = append(validationErrs, fmt.Errorf("the version we're preparing (%s) should be a more recent version number than the provided previous version number (%s)", new, old))
+	}
 
-	return nil
+	// Assert new is a later version than old
+	semverRECaps := `^(?P<major>\d{1,3})\.(?P<minor>\d{1,3})\.(?P<patch>\d{1,3})$`
+	re := regexp.MustCompile(semverRECaps)
+	newMatches := re.FindStringSubmatch(new)
+	oldMatches := re.FindStringSubmatch(old)
+
+	// Skip 0 element as it contains the whole input
+	for i := 1; i < len(newMatches); i++ {
+		n, err := strconv.Atoi(newMatches[i])
+		if err != nil {
+			validationErrs = append(validationErrs, fmt.Errorf("error converting %s to integer", newMatches[i]))
+		}
+		o, err := strconv.Atoi(oldMatches[i])
+		if err != nil {
+			validationErrs = append(validationErrs, fmt.Errorf("error converting %s to integer", oldMatches[i]))
+		}
+		if o > n {
+			validationErrs = append(validationErrs, fmt.Errorf("the version we're preparing (%s) should be a more recent version number than the provided previous version number (%s)", new, old))
+		}
+	}
+
+	return validationErrs
 }
 
 func checkSemVer(new, old string) error {
