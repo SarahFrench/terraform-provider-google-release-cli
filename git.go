@@ -7,52 +7,132 @@ import (
 	"strings"
 )
 
-type CommonCommitFinder struct {
+// GitInteract contains all the user-supplied information for interacting with git while preparing the releas
+type GitInteract struct {
 	Dir             string
 	PreviousRelease string
-
-	description          string
-	commitShaLastRelease string
-
-	stdout *bytes.Buffer
-	stderr *bytes.Buffer
+	Remote          string
 }
 
-func NewCommonCommitFinder(directory, previousRelease string) *CommonCommitFinder {
-	return &CommonCommitFinder{
+// GitCommand describes a git command that has been executed
+type GitCommand struct {
+	cmd    *exec.Cmd
+	stdout *bytes.Buffer
+	stderr *bytes.Buffer
+	runErr error
+}
+
+func NewGitInteract(directory, previousRelease string) *GitInteract {
+	return &GitInteract{
 		Dir:             directory,
 		PreviousRelease: previousRelease,
+	}
+}
 
+func (c *GitInteract) GetLastReleaseCommit() (string, GitCommand, error) {
+	gc := GitCommand{
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
-}
+	gc.cmd = exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", c.PreviousRelease))
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
 
-func (c *CommonCommitFinder) GetLastReleaseCommit() (string, error) {
-	c.wipeStreams()
-
-	cmd := exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", c.PreviousRelease))
-	cmd.Dir = c.Dir
-	cmd.Stderr = c.stderr
-	cmd.Stdout = c.stdout
-
-	c.description = cmd.String()
-
-	err := cmd.Run()
+	err := gc.cmd.Run()
 	if err != nil {
-		return "", err
+		gc.runErr = err
+		return "", gc, err
 	}
 
-	c.commitShaLastRelease = strings.ReplaceAll(c.stdout.String(), "\n", "")
-	return c.commitShaLastRelease, nil
+	commit := strings.ReplaceAll(gc.stdout.String(), "\n", "")
+	return commit, gc, nil
 }
 
-func (c *CommonCommitFinder) errorDescription(summary string, err error) string {
-	return fmt.Sprintf("%s:\n\tCommand: `%s`\n\tError: %s\n\tStdErr: %s", summary, c.description, err, c.stderr.String())
+func (c *GitInteract) PullTagsMainBranch() (GitCommand, error) {
+	gc := GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	gc.cmd = exec.Command("git", "pull", c.Remote, "--tags")
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	err := gc.cmd.Run()
+	if err != nil {
+		gc.runErr = err
+		return gc, err
+	}
+
+	return gc, nil
 }
 
-// wipeStreams ensures that the buffers for stderr/stdout are empty before running a new command
-func (c *CommonCommitFinder) wipeStreams() {
-	c.stderr = &bytes.Buffer{}
-	c.stdout = &bytes.Buffer{}
+func (c *GitInteract) Checkout(ref string) (GitCommand, error) {
+	gc := GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	gc.cmd = exec.Command("git", "checkout", ref)
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	err := gc.cmd.Run()
+	if err != nil {
+		gc.runErr = err
+		return gc, err
+	}
+
+	return gc, nil
+}
+
+func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string, GitCommand, error) {
+	gc := GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+
+	branchName := fmt.Sprintf("release-%s", releaseVersion)
+
+	// Create branch locally
+	gc.cmd = exec.Command("git", "checkout", "-b", branchName)
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	err := gc.cmd.Run()
+	if err != nil {
+		gc.runErr = err
+		return "", gc, err
+	}
+
+	// Push branch
+	gc = GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+	gc.cmd = exec.Command("git", "push", "-u", c.Remote, branchName)
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	err = gc.cmd.Run()
+	if err != nil {
+		gc.runErr = err
+		return "", gc, err
+	}
+
+	return branchName, gc, nil
+}
+
+// errorDescription returns a formatted string describing how a CLI command has failed
+// The output includes:
+//   - a user-supplied summary for the error
+//   - the command
+//   - the directory
+//   - the error returned from (c *exec.Cmd).Run()
+//   - the stderr from the command
+func (gc *GitCommand) errorDescription(summary string) string {
+	return fmt.Sprintf("%s:\n\tCommand: `%s`\n\tDirectory: %s\n\tError: %s\n\tStdErr: %s", summary, gc.cmd.String(), gc.cmd.Dir, gc.runErr, gc.stderr.String())
 }
