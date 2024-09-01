@@ -102,24 +102,28 @@ func main() {
 
 	// git pull $REMOTE main --tags && [ -n "$COMMIT_SHA" ] && git checkout $COMMIT_SHA && git checkout -b release-$RELEASE_VERSION && git push -u $REMOTE release-$RELEASE_VERSION
 	cmd = exec.Command("git", "pull", remote, "--tags")
+	cmd.Dir = providerDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("error when pulling tags: `%s` :\n\t%s", cmd.String(), string(output))
 	}
 
 	cmd = exec.Command("git", "checkout", commitSha)
+	cmd.Dir = providerDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("error when checking out provided commit SHA: `%s` :\n\t%s", cmd.String(), string(output))
 	}
 
 	cmd = exec.Command("git", "checkout", "-b", fmt.Sprintf("release-%s", releaseVersion))
+	cmd.Dir = providerDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("error when creating a new release branch: `%s` :\n\t%s", cmd.String(), string(output))
 	}
 
 	cmd = exec.Command("git", "push", "-u", remote, fmt.Sprintf("release-%s", releaseVersion))
+	cmd.Dir = providerDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("error when pushing the new release branch: `%s` :\n\t%s", cmd.String(), string(output))
