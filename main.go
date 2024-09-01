@@ -88,15 +88,12 @@ func main() {
 	}
 
 	// Run commands to create the release branch
-	cmd := exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", previousReleaseVersion))
-	cmd.Dir = providerDir
-
-	output, err := cmd.CombinedOutput()
+	cf := NewCommonCommitFinder(providerDir, previousReleaseVersion)
+	lastRelease, err := cf.GetLastReleaseCommit()
 	if err != nil {
-		log.Fatalf("error when running `%s`:\n\t%s", cmd.String(), string(output))
+		log.Fatal(cf.errorDescription("error when getting last release's commit", err))
 	}
-	commitShaLastRelease := string(output)
-	fmt.Println(commitShaLastRelease)
+	fmt.Println(lastRelease)
 
 	log.Printf("Starting to create and push new release branch %s", fmt.Sprintf("release-%s", releaseVersion))
 
