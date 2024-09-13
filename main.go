@@ -87,45 +87,46 @@ func main() {
 		providerDir = HOME + "/go/src/github.com/SarahFrench/terraform-provider-google-beta"
 	}
 
+	gi := GitInteract{
+		Dir:             providerDir,
+		PreviousRelease: previousReleaseVersion,
+		Remote:          remote,
+	}
+
+	// Ensure we have checkout out main
+	cmd, err := gi.Checkout("main")
+	if err != nil {
+		log.Fatal(cmd.errorDescription("error when checking out provided commit SHA"))
+	}
+
 	// Run commands to create the release branch
-	cmd := exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", previousReleaseVersion))
-	cmd.Dir = providerDir
-
-	output, err := cmd.CombinedOutput()
+	lastRelease, cmd, err := gi.GetLastReleaseCommit()
 	if err != nil {
-		log.Fatalf("error when running `%s`:\n\t%s", cmd.String(), string(output))
+		log.Fatal(cmd.errorDescription("error when getting last release's commit"))
 	}
-	commitShaLastRelease := string(output)
-	fmt.Println(commitShaLastRelease)
+	fmt.Println(lastRelease)
 
-	log.Printf("Starting to create and push new release branch %s", fmt.Sprintf("release-%s", releaseVersion))
+	log.Print("Starting to create and push new release branch")
 
-	// git pull $REMOTE main --tags && [ -n "$COMMIT_SHA" ] && git checkout $COMMIT_SHA && git checkout -b release-$RELEASE_VERSION && git push -u $REMOTE release-$RELEASE_VERSION
-	cmd = exec.Command("git", "pull", remote, "--tags")
-	output, err = cmd.CombinedOutput()
+	// git pull $REMOTE main --tags
+	cmd, err = gi.PullTagsMainBranch()
 	if err != nil {
-		log.Fatalf("error when pulling tags: `%s` :\n\t%s", cmd.String(), string(output))
+		log.Fatal(cmd.errorDescription("error when pulling tags"))
 	}
 
-	cmd = exec.Command("git", "checkout", commitSha)
-	output, err = cmd.CombinedOutput()
+	// git checkout $COMMIT_SHA
+	cmd, err = gi.Checkout(commitSha)
 	if err != nil {
-		log.Fatalf("error when checking out provided commit SHA: `%s` :\n\t%s", cmd.String(), string(output))
+		log.Fatal(cmd.errorDescription("error when checking out provided commit SHA"))
 	}
 
-	cmd = exec.Command("git", "checkout", "-b", fmt.Sprintf("release-%s", releaseVersion))
-	output, err = cmd.CombinedOutput()
+	// git checkout -b release-$RELEASE_VERSION && git push -u $REMOTE release-$RELEASE_VERSION
+	branchName, cmd, err := gi.CreateAndPushReleaseBranch(releaseVersion)
 	if err != nil {
-		log.Fatalf("error when creating a new release branch: `%s` :\n\t%s", cmd.String(), string(output))
+		log.Fatal(cmd.errorDescription("error when creating a new release branch"))
 	}
 
-	cmd = exec.Command("git", "push", "-u", remote, fmt.Sprintf("release-%s", releaseVersion))
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		log.Fatalf("error when pushing the new release branch: `%s` :\n\t%s", cmd.String(), string(output))
-	}
-
-	log.Printf("Release branch %s was created and pushed", fmt.Sprintf("release-%s", releaseVersion))
+	log.Printf("Release branch %s was created and pushed", branchName)
 
 	log.Printf("https://github.com/hashicorp/%s/edit/release-%s/CHANGELOG.md", providerRepo, releaseVersion)
 
