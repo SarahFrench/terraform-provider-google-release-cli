@@ -2,10 +2,14 @@ package git
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"testing"
 )
 
-type executeMock struct{}
+type executeMock struct {
+	testArg string
+}
 
 // Command wraps exec.Command
 func (e *executeMock) Command(name string, arg ...string) Cmder {
@@ -13,6 +17,8 @@ func (e *executeMock) Command(name string, arg ...string) Cmder {
 		cmd:  &CommandMock{},
 		name: name,
 		args: arg,
+
+		testArg: e.testArg,
 	}
 }
 
@@ -20,6 +26,8 @@ type CommandMock struct {
 	Dir    string
 	Stdout *bytes.Buffer
 	Stderr *bytes.Buffer
+
+	testArg string
 }
 
 type CmdMock struct {
@@ -27,6 +35,8 @@ type CmdMock struct {
 	name        string
 	args        []string
 	description string
+
+	testArg string
 }
 
 func (c *CmdMock) SetDir(dir string) {
@@ -50,6 +60,14 @@ func (c *CmdMock) Run() error {
 	for _, v := range c.args {
 		c.description = c.description + " " + v
 	}
+
+	// This switch allows us to force the commands to fail with specific errors
+	// or just generic errors to assert an error is returned
+	switch c.testArg {
+	case "CreateAndPushReleaseBranch fails on checkout":
+		return errors.New("forced error from test mock")
+	}
+
 	return nil
 }
 
@@ -57,13 +75,15 @@ func (c *CmdMock) Description() string {
 	return ""
 }
 
-func NewTestGitInteract(directory, previousRelease, remote string) *GitInteract {
+func NewTestGitInteract(directory, previousRelease, remote, testArg string) *GitInteract {
 	return &GitInteract{
 		Dir:             directory,
 		PreviousRelease: previousRelease,
 		Remote:          remote,
 
-		exec: &executeMock{},
+		exec: &executeMock{
+			testArg: testArg,
+		},
 	}
 }
 
@@ -87,23 +107,49 @@ func Test_NewGitInteract(t *testing.T) {
 func Test_NewGitInteract_commands(t *testing.T) {
 	dir := "dir"
 	previousReleaseVersion := "1.1.1"
+	newReleaseVersion := "1.2.0"
 	remote := "origin"
 
 	cases := map[string]struct {
 		expectedCommand string
+		expectedOutput  string
 		callFunction    func(*GitInteract) (string, GitCommand, error)
+		testArg         string // argument used to control failures of the run command
+		expectError     bool
 	}{
-		"Checkout function should checkout the provided branch name": {
+		"Checkout: function should checkout the provided branch name": {
 			expectedCommand: "git checkout main",
 			callFunction: func(gi *GitInteract) (string, GitCommand, error) {
 				gc, err := gi.Checkout("main")
 				return "", gc, err
 			},
 		},
-		"GetLastReleaseCommit function should perform merge-base between main and the provided previous version": {
+		"GetLastReleaseCommit: function should perform merge-base between main and the provided previous version": {
 			expectedCommand: "git merge-base main v" + previousReleaseVersion,
 			callFunction: func(gi *GitInteract) (string, GitCommand, error) {
 				return gi.GetLastReleaseCommit()
+			},
+		},
+		"PullTagsMainBranch: function should perform 'git pull <remote> --tags'": {
+			expectedCommand: "git pull " + remote + " --tags",
+			callFunction: func(gi *GitInteract) (string, GitCommand, error) {
+				gc, err := gi.PullTagsMainBranch()
+				return "", gc, err
+			},
+		},
+		"CreateAndPushReleaseBranch: function should finish by performing 'git checkout <string>'": {
+			expectedCommand: "git push -u " + remote + " release-" + newReleaseVersion,
+			expectedOutput:  "release-" + newReleaseVersion,
+			callFunction: func(gi *GitInteract) (string, GitCommand, error) {
+				return gi.CreateAndPushReleaseBranch(newReleaseVersion)
+			},
+		},
+		"CreateAndPushReleaseBranch: function stops after first command if it errors": {
+			testArg:         "CreateAndPushReleaseBranch fails on checkout",
+			expectError:     true,
+			expectedCommand: "git checkout -b " + fmt.Sprintf("release-%s", newReleaseVersion),
+			callFunction: func(gi *GitInteract) (string, GitCommand, error) {
+				return gi.CreateAndPushReleaseBranch(newReleaseVersion)
 			},
 		},
 	}
@@ -111,11 +157,18 @@ func Test_NewGitInteract_commands(t *testing.T) {
 	for tn, tc := range cases {
 		t.Run(tn, func(t *testing.T) {
 
-			gi := NewTestGitInteract(dir, previousReleaseVersion, remote)
+			gi := NewTestGitInteract(dir, previousReleaseVersion, remote, tc.testArg)
 
-			_, gc, err := tc.callFunction(gi)
+			output, gc, err := tc.callFunction(gi)
 			if err != nil {
-				t.Fatal("unexpected error occurred")
+				if tc.expectError == false {
+					t.Fatal("unexpected error occurred")
+				}
+				// fall through on error, as we force these as part of testing
+			}
+
+			if output != tc.expectedOutput {
+				t.Fatalf("wanted output %s, got: %s", tc.expectedOutput, output)
 			}
 
 			gcMock := gc.cmd.(*CmdMock)
