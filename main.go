@@ -8,17 +8,15 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
+
+	"github.com/SarahFrench/google-provider-release-cli/internal/config"
 )
 
 var changelogExecutable string = "changelog-gen"
 
-var defaultRemote string = "origin"
-
 func main() {
 
 	// Handle inputs via flags
-	var remote string
-	var mmRepoPath string
 	// var githubToken string //TODO
 	var commitSha string
 	var releaseVersion string
@@ -26,8 +24,6 @@ func main() {
 	var ga bool
 	var beta bool
 
-	flag.StringVar(&remote, "remote", defaultRemote, "REMOTE is the name of the primary repo's remote on your machine. Typically `upstream` or `origin`")
-	flag.StringVar(&mmRepoPath, "mm_repo_path", "", "should point to your checked-out copy of the GoogleCloudPlatform/magic-modules repo")
 	// flag.StringVar(&githubToken, "gh_token", "", "Create a PAT with no permissions, see: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token")
 	flag.StringVar(&commitSha, "commit_sha", "", "The commit from the main branch that will be used for the release")
 	flag.StringVar(&releaseVersion, "release_version", "", "The version that we're about to prepare, in format 4.XX.0")
@@ -37,14 +33,15 @@ func main() {
 	flag.Parse()
 
 	// Validate inputs where possible
-
 	validationErrs := []error{} // Collect errors and report them all later
-	err := assertPathExists(mmRepoPath)
-	if err != nil {
-		validationErrs = append(validationErrs, err)
+
+	// Load in config
+	c, errs := config.LoadConfigFromFile()
+	if len(errs) > 0 {
+		validationErrs = append(validationErrs, errs...)
 	}
 
-	errs := validateVersionInputs(releaseVersion, previousReleaseVersion)
+	errs = validateVersionInputs(releaseVersion, previousReleaseVersion)
 	if len(errs) != 0 {
 		validationErrs = append(validationErrs, errs...)
 	}
@@ -61,7 +58,7 @@ func main() {
 	}
 
 	// Make sure dependencies present
-	_, err = exec.LookPath(changelogExecutable)
+	_, err := exec.LookPath(changelogExecutable)
 	if err != nil {
 		validationErrs = append(validationErrs, fmt.Errorf("you need to have changelog-gen in your PATH to use this CLI. Ensure it is in your PATH or download it via: go install github.com/paultyng/changelog-gen@master"))
 	}
@@ -75,22 +72,24 @@ func main() {
 	}
 
 	// Prepare
-	HOME := os.Getenv("HOME")
 	var providerDir string
 	var providerRepo string
-	if ga {
+
+	switch {
+	case ga:
 		providerRepo = "terraform-provider-google"
-		providerDir = HOME + "/go/src/github.com/SarahFrench/terraform-provider-google"
-	}
-	if beta {
+		providerDir = c.GooglePath
+	case beta:
 		providerRepo = "terraform-provider-google-beta"
-		providerDir = HOME + "/go/src/github.com/SarahFrench/terraform-provider-google-beta"
+		providerDir = c.GoogleBetaPath
+	default:
+		log.Fatal("error determining which repo is being generated")
 	}
 
 	gi := GitInteract{
 		Dir:             providerDir,
 		PreviousRelease: previousReleaseVersion,
-		Remote:          remote,
+		Remote:          c.Remote,
 	}
 
 	// Ensure we have checkout out main
