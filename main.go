@@ -9,7 +9,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/SarahFrench/google-provider-release-cli/internal/config"
+	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/config"
+	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/git"
 )
 
 var changelogExecutable string = "changelog-gen"
@@ -86,7 +87,7 @@ func main() {
 		log.Fatal("error determining which repo is being generated")
 	}
 
-	gi := GitInteract{
+	gi := git.GitInteract{
 		Dir:             providerDir,
 		PreviousRelease: previousReleaseVersion,
 		Remote:          c.Remote,
@@ -95,13 +96,13 @@ func main() {
 	// Ensure we have checkout out main
 	cmd, err := gi.Checkout("main")
 	if err != nil {
-		log.Fatal(cmd.errorDescription("error when checking out provided commit SHA"))
+		log.Fatal(cmd.ErrorDescription("error when checking out provided commit SHA"))
 	}
 
 	// Run commands to create the release branch
 	lastRelease, cmd, err := gi.GetLastReleaseCommit()
 	if err != nil {
-		log.Fatal(cmd.errorDescription("error when getting last release's commit"))
+		log.Fatal(cmd.ErrorDescription("error when getting last release's commit"))
 	}
 	fmt.Println(lastRelease)
 
@@ -110,19 +111,19 @@ func main() {
 	// git pull $REMOTE main --tags
 	cmd, err = gi.PullTagsMainBranch()
 	if err != nil {
-		log.Fatal(cmd.errorDescription("error when pulling tags"))
+		log.Fatal(cmd.ErrorDescription("error when pulling tags"))
 	}
 
 	// git checkout $COMMIT_SHA
 	cmd, err = gi.Checkout(commitSha)
 	if err != nil {
-		log.Fatal(cmd.errorDescription("error when checking out provided commit SHA"))
+		log.Fatal(cmd.ErrorDescription("error when checking out provided commit SHA"))
 	}
 
 	// git checkout -b release-$RELEASE_VERSION && git push -u $REMOTE release-$RELEASE_VERSION
 	branchName, cmd, err := gi.CreateAndPushReleaseBranch(releaseVersion)
 	if err != nil {
-		log.Fatal(cmd.errorDescription("error when creating a new release branch"))
+		log.Fatal(cmd.ErrorDescription("error when creating a new release branch"))
 	}
 
 	log.Printf("Release branch %s was created and pushed", branchName)
