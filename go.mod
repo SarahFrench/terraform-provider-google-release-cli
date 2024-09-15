@@ -1,3 +1,3 @@
-module github.com/SarahFrench/google-provider-release-cli
+module github.com/SarahFrench/terraform-provider-google-release-cli
 
 go 1.21.4
