@@ -1,4 +1,4 @@
-package main
+package git
 
 import (
 	"bytes"
@@ -126,13 +126,13 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 	return branchName, gc, nil
 }
 
-// errorDescription returns a formatted string describing how a CLI command has failed
+// ErrorDescription returns a formatted string describing how a CLI command has failed
 // The output includes:
 //   - a user-supplied summary for the error
 //   - the command
 //   - the directory
 //   - the error returned from (c *exec.Cmd).Run()
 //   - the stderr from the command
-func (gc *GitCommand) errorDescription(summary string) string {
+func (gc *GitCommand) ErrorDescription(summary string) string {
 	return fmt.Sprintf("%s:\n\tCommand: `%s`\n\tDirectory: %s\n\tError: %s\n\tStdErr: %s", summary, gc.cmd.String(), gc.cmd.Dir, gc.runErr, gc.stderr.String())
 }
