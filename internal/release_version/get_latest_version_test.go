@@ -13,8 +13,10 @@ func TestGetLastVersionFromGitHub(t *testing.T) {
 		client := &http.Client{Timeout: 10 * time.Second}
 		c := ReleaseQuery{
 			client: client,
+			owner:  "hashicorp",
+			repo:   "terraform-provider-google",
 		}
-		ver, err := c.GetLastVersionFromGitHub("terraform-provider-google")
+		ver, err := c.GetLastVersionFromGitHub()
 		if err != nil {
 			t.Fatalf("unexpected error(s) encountered: %v", err)
 		}
