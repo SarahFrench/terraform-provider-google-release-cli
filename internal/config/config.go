@@ -34,6 +34,8 @@ func (ve compositeValidationError) Error() string {
 }
 
 var CONFIG_FILE_NAME = ".tpg-cli-config.json"
+var GA_REPO_NAME = "terraform-provider-google"
+var BETA_REPO_NAME = "terraform-provider-google-beta"
 
 func (c *Config) validate() error {
 
@@ -114,4 +116,15 @@ func LoadConfigFromFile() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func (c *Config) GetProviderDirectoryPath(provider string) string {
+	switch provider {
+	case GA_REPO_NAME:
+		return c.GoogleBetaPath
+	case BETA_REPO_NAME:
+		return c.GooglePath
+	default:
+		return fmt.Sprintf("no directory in config for provider %s", provider)
+	}
 }
