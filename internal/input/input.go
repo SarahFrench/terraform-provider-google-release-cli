@@ -11,8 +11,11 @@ const (
 )
 
 type Input struct {
-	CommitSha              string
-	ReleaseVersion         string
+	// CommitSha is the SHA1 hash of the commit we want to use as the basis of the new release
+	CommitSha string
+	// ReleaseVersion is the new release's semver tag in format v1.2.3
+	ReleaseVersion string
+	// PreviousReleaseVersion is the latest release's semver tag in format v1.2.3
 	PreviousReleaseVersion string
 	Provider               Provider
 }
