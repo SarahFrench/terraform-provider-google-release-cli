@@ -28,6 +28,18 @@ func validateGaBetaInputs(ga, beta bool) error {
 	return nil
 }
 
+func validateProviderInputs(providerVersion string) error {
+	pv := strings.ToLower(providerVersion)
+	switch pv {
+	case "ga":
+		return nil
+	case "beta":
+		return nil
+	default:
+		return fmt.Errorf("bad provider version input, please answer 'ga' or 'beta' ")
+	}
+}
+
 func validateCommitShaInput(commitSha string) error {
 	if commitSha == "" {
 		return fmt.Errorf("you need to provide a commit SHA to be the basis of the new release")
