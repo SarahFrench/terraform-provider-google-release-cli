@@ -92,7 +92,8 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 		stderr: &bytes.Buffer{},
 	}
 
-	branchName := fmt.Sprintf("release-%s", releaseVersion)
+	version := strings.TrimPrefix(releaseVersion, "v") // Remove prefix v1.2.3 => 1.2.3
+	branchName := fmt.Sprintf("release-%s", version)
 
 	// Create branch locally
 	gc.cmd = exec.Command("git", "checkout", "-b", branchName)
