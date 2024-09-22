@@ -42,7 +42,7 @@ func New(ga, beta bool, commitSha, releaseVersion, previousReleaseVersion string
 		errs = append(errs, err)
 	}
 	if err := validateVersionInputs(releaseVersion, previousReleaseVersion); err != nil {
-		errs = append(errs, err...)
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {
@@ -54,11 +54,13 @@ func New(ga, beta bool, commitSha, releaseVersion, previousReleaseVersion string
 		ReleaseVersion:         releaseVersion,
 		PreviousReleaseVersion: previousReleaseVersion,
 	}
-	if ga {
+	switch {
+	case ga:
 		i.Provider = GA
-	}
-	if beta {
+	case beta:
 		i.Provider = BETA
+	default:
+		return Input{}, fmt.Errorf("unable to determing provider version value from inputs")
 	}
 
 	return i, nil
