@@ -13,6 +13,10 @@ type Config struct {
 	GooglePath       string `json:"googlePath"`
 	GoogleBetaPath   string `json:"googleBetaPath"`
 	Remote           string `json:"remote"`
+
+	// RemoteOwner defaults to 'hashicorp' but can be set in config to enable using
+	// the CLI with a fork of the official HashiCorp repository.
+	RemoteOwner string `json:"remoteOwner"`
 }
 
 type compositeValidationError []error
@@ -66,6 +70,10 @@ func (c *Config) validate() error {
 		errs = append(errs, errors.New("error in loaded config: remote is empty/missing"))
 	}
 
+	if c.RemoteOwner == "" {
+		errs = append(errs, errors.New("error in loaded config: remote repo owner is empty/missing"))
+	}
+
 	if len(errs) > 0 {
 		return errs
 	}
@@ -91,6 +99,9 @@ func LoadConfigFromFile() (*Config, error) {
 	config := Config{}
 	if err = jsonParser.Decode(&config); err != nil {
 		return nil, append(errs, fmt.Errorf("error parsing config file: %w", err))
+	}
+	if config.RemoteOwner == "" {
+		config.RemoteOwner = "hashicorp"
 	}
 
 	err = config.validate()
