@@ -39,8 +39,7 @@ func (c *GitInteract) GetLastReleaseCommit() (string, GitCommand, error) {
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
@@ -59,8 +58,7 @@ func (c *GitInteract) PullTagsMainBranch() (GitCommand, error) {
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return gc, err
 	}
@@ -78,8 +76,7 @@ func (c *GitInteract) Checkout(ref string) (GitCommand, error) {
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return gc, err
 	}
@@ -101,8 +98,7 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
@@ -117,8 +113,7 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err = gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
