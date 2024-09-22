@@ -53,9 +53,9 @@ func main() {
 	}
 
 	// Prepare
-	providerRepoName, _ := input.GetProviderRepoName()
+	dir := c.GetProviderDirectoryPath(input.GetProviderRepoName())
 	gi := git.GitInteract{
-		Dir:             providerRepoName,
+		Dir:             dir,
 		PreviousRelease: input.PreviousReleaseVersion,
 		Remote:          c.Remote,
 	}
