@@ -39,8 +39,8 @@ func main() {
 	}
 
 	// Load in config
-	c, errs := config.LoadConfigFromFile()
-	if len(errs) > 0 {
+	c, err := config.LoadConfigFromFile()
+	if err != nil {
 		fmt.Print(err.Error())
 		os.Exit(1)
 	}

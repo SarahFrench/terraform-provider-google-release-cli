@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -14,10 +15,26 @@ type Config struct {
 	Remote           string `json:"remote"`
 }
 
+type compositeValidationError []error
+
+func (ve compositeValidationError) Error() string {
+	if len(ve) > 0 {
+		var b strings.Builder
+		b.WriteString("There were some problems with the command's config:\n")
+		for _, e := range ve {
+			b.WriteString(fmt.Sprintf("\t> %v\n", e))
+		}
+		return b.String()
+	}
+	return "this error should not be surfaced, and if it's observed it's due to a bug in the CLI"
+}
+
 var CONFIG_FILE_NAME = ".tpg-cli-config.json"
 
-func (c *Config) validate() []error {
-	var errs []error
+func (c *Config) validate() error {
+
+	var errs compositeValidationError
+
 	if c.MagicModulesPath == "" {
 		errs = append(errs, errors.New("error in loaded config: magicModulesPath is empty/missing"))
 	} else {
@@ -48,12 +65,17 @@ func (c *Config) validate() []error {
 	if c.Remote == "" {
 		errs = append(errs, errors.New("error in loaded config: remote is empty/missing"))
 	}
-	return errs
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
 }
 
-func LoadConfigFromFile() (*Config, []error) {
+func LoadConfigFromFile() (*Config, error) {
 
-	var errs []error
+	var errs compositeValidationError
 	home := os.Getenv("HOME")
 	if home == "" {
 		return nil, append(errs, errors.New("cannot find HOME environment variable, please make sure it is available"))
@@ -71,10 +93,14 @@ func LoadConfigFromFile() (*Config, []error) {
 		return nil, append(errs, fmt.Errorf("error parsing config file: %w", err))
 	}
 
-	errs = config.validate()
-	if len(errs) > 0 {
-		return nil, append(errs, fmt.Errorf("encountered %d errors when validating the contents of ~/%s", len(errs), CONFIG_FILE_NAME))
+	err = config.validate()
+	if err != nil {
+		return nil, append(errs, err)
 	}
 
-	return &config, errs
+	if len(errs) > 0 {
+		return nil, append(errs, err)
+	}
+
+	return &config, nil
 }
