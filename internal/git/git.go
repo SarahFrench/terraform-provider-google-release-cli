@@ -30,11 +30,13 @@ func NewGitInteract(directory, previousRelease string) *GitInteract {
 }
 
 func (c *GitInteract) GetLastReleaseCommit() (string, GitCommand, error) {
+
+	// Get the common commit between the last release and the new release we're preparing
 	gc := GitCommand{
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
-	gc.cmd = exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", c.PreviousRelease))
+	gc.cmd = exec.Command("git", "merge-base", "main", c.PreviousRelease)
 	gc.cmd.Dir = c.Dir
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
