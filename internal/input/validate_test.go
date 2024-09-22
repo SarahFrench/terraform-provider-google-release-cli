@@ -1,10 +1,10 @@
-package main
+package input
 
 import (
 	"testing"
 )
 
-func Test_validateVersionInputs(t *testing.T) {
+func Test_ValidateVersionInputs(t *testing.T) {
 	cases := map[string]struct {
 		new       string
 		old       string

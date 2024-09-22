@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -88,14 +87,10 @@ func TestConfig_validate(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
-			errs := tc.config.validate()
-			if len(errs) > 0 {
+			err := tc.config.validate()
+			if err != nil {
 				if tc.expectError == false {
-					var errStr []string
-					for _, v := range errs {
-						errStr = append(errStr, v.Error())
-					}
-					t.Fatalf("%d unexpected error(s) encountered: %v", len(errs), strings.Join(errStr, ", "))
+					t.Fatalf("unexpected error(s) encountered: %v", err)
 				}
 				// error is expected but we don't assert what error
 			}
@@ -138,15 +133,11 @@ func TestConfig_LoadConfigFromFile(t *testing.T) {
 	t.Setenv("HOME", tmpDir)
 
 	// Act
-	c, errs := LoadConfigFromFile()
+	c, err := LoadConfigFromFile()
 
 	// Assert
-	if len(errs) > 0 {
-		var errStr []string
-		for _, v := range errs {
-			errStr = append(errStr, v.Error())
-		}
-		t.Fatalf("%d unexpected error(s) encountered: %v", len(errs), strings.Join(errStr, ", "))
+	if err != nil {
+		t.Fatalf("unexpected error(s) encountered: %s", err)
 	}
 
 	if c.MagicModulesPath != tmpDir {
