@@ -1,13 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/config"
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/git"
@@ -49,7 +46,7 @@ func main() {
 
 	// Ready to collect input
 	input := input_pkg.Input{}
-	reader := bufio.NewReader(os.Stdin)
+	handler := input_pkg.NewHandler(&input)
 
 	// PROVIDER CHOICE
 	fmt.Println()
@@ -63,70 +60,33 @@ func main() {
 		fmt.Printf("\tMaking a release for %s\n", input.GetProviderRepoName())
 	} else {
 		// Need to get info via stdin
-		fmt.Println("What provider do you want to make a release for (ga/beta)?")
-
-		pv, err := reader.ReadString('\n') // blocks until the delimiter is entered
+		err = handler.PromptAndProcessProviderChoiceInput()
 		if err != nil {
-			log.Fatal(err.Error())
-		}
-		pv = prepareStdinInput(pv)
-		if err := input.SetProvider(pv); err != nil {
 			log.Fatal(err.Error())
 		}
 	}
 
 	// RELEASE VERSION CHOICE
-	rq := release_version.New(c.RemoteOwner, input.GetProviderRepoName())
-	latestVersion, err := rq.GetLastVersionFromGitHub()
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	fmt.Println()
 	if releaseVersionFlag != "" || previousReleaseVersionFlag != "" {
 		// Info provided by flags
 		fmt.Println("Release version infomation provided by flags:")
 		fmt.Printf("\tPrevious release version: %s\n", previousReleaseVersionFlag)
 		fmt.Printf("\tNew release version: %s\n", releaseVersionFlag)
 	} else {
+
+		// Prepare info about the last release and proposed new minor release versions.
+		rq := release_version.New(c.RemoteOwner, input.GetProviderRepoName())
+		latestVersion, err := rq.GetLastVersionFromGitHub()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		proposedNextVersion, err := release_version.NextMinorVersion(latestVersion)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
 		// Need to get info via stdin
-		nextVersion, err := release_version.NextMinorVersion(latestVersion)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		fmt.Printf("The latest release of %s is %s\n", input.GetProviderRepoName(), latestVersion)
-		fmt.Printf("Are you planning on making the next minor release, %s? (y/n)\n", nextVersion)
-
-		in, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		in = prepareStdinInput(in)
-		switch in {
-		case "y":
-			if err := input.SetReleaseVersions(nextVersion, latestVersion); err != nil {
-				log.Fatal(err.Error())
-			}
-		case "n":
-			fmt.Println("Provide the previous release version as a semver string, e.g. v1.2.3:")
-			old, err := reader.ReadString('\n') // blocks until the delimiter is entered
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			old = prepareStdinInput(old)
-
-			fmt.Println("Provide the new release version we are prepating as a semver string, e.g. v1.2.3:")
-			new, err := reader.ReadString('\n') // blocks until the delimiter is entered
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			new = prepareStdinInput(new)
-
-			if err := input.SetReleaseVersions(new, old); err != nil {
-				log.Fatal(err.Error())
-			}
-		default:
-			log.Fatal("bad input where y/n was expected, exiting")
-		}
+		handler.PromptAndProcessReleaseVersionChoiceInput(latestVersion, proposedNextVersion)
 	}
 
 	// 'COMMIT TO CUT RELEASE ON' CHOICE
@@ -137,16 +97,7 @@ func main() {
 		input.SetCommit(commitShaFlag)
 	} else {
 		// Need to get info via stdin
-		fmt.Println("What commit do you want to use to cut the release?")
-
-		c, err := reader.ReadString('\n') // blocks until the delimiter is entered
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		c = prepareStdinInput(c)
-		if err := input.SetCommit(c); err != nil {
-			log.Fatal(err.Error())
-		}
+		handler.PromptAndProcessCommitChoiceInput()
 	}
 
 	// Double check inputs from above
@@ -200,10 +151,4 @@ func main() {
 	log.Printf("https://github.com/%s/%s/edit/release-%s/CHANGELOG.md", c.RemoteOwner, input.GetProviderRepoName(), input.ReleaseVersion)
 
 	log.Println("Done!")
-}
-
-func prepareStdinInput(in string) string {
-	in = strings.TrimSuffix(in, "\n")
-	in = strings.ToLower(in)
-	return in
 }
