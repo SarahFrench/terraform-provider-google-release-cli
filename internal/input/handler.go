@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 )
@@ -25,32 +24,39 @@ func NewHandler(input *Input) Handler {
 	}
 }
 
-func (h Handler) PromptAndProcessProviderChoiceInput() error {
+func (h *Handler) WaitForResponse() (string, error) {
+	pv, err := h.reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	pv = prepareStdinInput(pv)
+	return pv, nil
+}
+
+func (h *Handler) PromptAndProcessProviderChoiceInput() error {
 
 	fmt.Println("What provider do you want to make a release for (ga/beta)?")
 
-	pv, err := h.reader.ReadString('\n')
+	pv, err := h.WaitForResponse()
 	if err != nil {
 		return err
 	}
-	pv = prepareStdinInput(pv)
 	if err := h.input.SetProvider(pv); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (h Handler) PromptAndProcessReleaseVersionChoiceInput(lastRelaseVersion, possibleNextVersion string) error {
+func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastRelaseVersion, possibleNextVersion string) error {
 
 	fmt.Printf("The latest release of %s is %s\n", h.input.GetProviderRepoName(), lastRelaseVersion)
 	fmt.Printf("Are you planning on making the next minor release, %s? (y/n)\n", possibleNextVersion)
 
-	in, err := h.reader.ReadString('\n')
+	in, err := h.WaitForResponse()
 	if err != nil {
 		return err
 	}
 
-	in = prepareStdinInput(in)
 	switch in {
 	case "y":
 		if err := h.input.SetReleaseVersions(possibleNextVersion, lastRelaseVersion); err != nil {
@@ -80,15 +86,15 @@ func (h Handler) PromptAndProcessReleaseVersionChoiceInput(lastRelaseVersion, po
 	return errors.New("bad input where y/n was expected, exiting")
 }
 
-func (h Handler) PromptAndProcessCommitChoiceInput() error {
+func (h *Handler) PromptAndProcessCommitChoiceInput() error {
 
 	fmt.Println("What commit do you want to use to cut the release?")
 
-	c, err := h.reader.ReadString('\n')
+	c, err := h.WaitForResponse()
 	if err != nil {
-		log.Fatal(err.Error())
+		return err
 	}
-	c = prepareStdinInput(c)
+
 	if err := h.input.SetCommit(c); err != nil {
 		return err
 	}
