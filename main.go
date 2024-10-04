@@ -71,9 +71,13 @@ func main() {
 	// RELEASE VERSION CHOICE
 	if releaseVersionFlag != "" || previousReleaseVersionFlag != "" {
 		// Info provided by flags
-		fmt.Println("Release version infomation provided by flags:")
-		fmt.Printf("\tPrevious release version: %s\n", previousReleaseVersionFlag)
-		fmt.Printf("\tNew release version: %s\n", releaseVersionFlag)
+		log.Println("Release version infomation provided by flags:")
+		log.Printf("\tPrevious release version: %s\n", previousReleaseVersionFlag)
+		log.Printf("\tNew release version: %s\n", releaseVersionFlag)
+		err := input.SetReleaseVersions(releaseVersionFlag, previousReleaseVersionFlag)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
 	} else {
 
 		// Prepare info about the last release and proposed new minor release versions.
@@ -92,10 +96,9 @@ func main() {
 	}
 
 	// 'COMMIT TO CUT RELEASE ON' CHOICE
-	fmt.Println()
 	if commitShaFlag != "" {
 		// Info provided by flags
-		fmt.Printf("Release cut commit provided by flag: %s\n", commitShaFlag)
+		log.Printf("Release cut commit provided by flag: %s\n", commitShaFlag)
 		input.SetCommit(commitShaFlag)
 	} else {
 		// Need to get info via stdin
@@ -129,7 +132,6 @@ func main() {
 	if err != nil {
 		log.Fatal(cmd.ErrorDescription("error when getting last release's commit"))
 	}
-	fmt.Println(lastReleaseCommit) // TODO remove when used in future code
 
 	log.Print("Starting to create and push new release branch")
 
