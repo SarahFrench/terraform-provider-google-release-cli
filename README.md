@@ -30,9 +30,13 @@ vi  $HOME/.tpg-cli-config.json
 }
 ```
 
+
 ## Using the CLI
 
 The CLI can be run using flags or can interactively ask for input values.
+
+You can run the CLI from any directory and you don't need to worry about checking out a given branch before starting to cut the release branch.
+
 
 ### Interactive mode
 
@@ -73,6 +77,7 @@ Copy the CHANGELOG below into : https://github.com/hashicorp/terraform-provider-
 <print out of changelog-gen tool to terminal>
 ```
 
+
 ### Using flags
 
 | Flag                  | Usage                                                                                                                                         |
@@ -89,7 +94,8 @@ Copy the CHANGELOG below into : https://github.com/hashicorp/terraform-provider-
 
 It's possible to use a combination of flags and interactive prompts, and the tool will print to the terminal to let you know which is used.
 
-## This CLI replaces the need to run bash
+
+## This CLI replaces the need to run bash commands when releasing a new version of the Google provider.
 
 The Google provider's [release process is documented here]([https://github.com/hashicorp/terraform-provider-google/wiki/Release-Process](https://github.com/hashicorp/terraform-provider-google/wiki/Release-Process#on-wednesday)) as a large amount of bash:
 
@@ -117,3 +123,5 @@ go install github.com/paultyng/changelog-gen@master
 changelog-gen -repo $REPO_NAME -branch main -owner hashicorp -changelog ${MM_REPO}/.ci/changelog.tmpl -releasenote ${MM_REPO}/.ci/release-note.tmpl -no-note-label "changelog: no-release-note" $COMMIT_SHA_OF_LAST_RELEASE $COMMIT_SHA_OF_LAST_COMMIT_IN_CURRENT_RELEASE
 open https://github.com/hashicorp/$REPO_NAME/edit/release-$RELEASE_VERSION/CHANGELOG.md
 ```
+
+This bash needs to be run inside the repo of the provider that you're cutting the release for, but the CLI tool can be run from any directory.
