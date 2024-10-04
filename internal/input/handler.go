@@ -62,6 +62,7 @@ func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastReleaseVersion, 
 		if err := h.input.SetReleaseVersions(possibleNextVersion, lastReleaseVersion); err != nil {
 			return err
 		}
+		return nil
 	case "n":
 		// The user might be making a patch release, major release, or a backport. Asking for previous version and new version enables all these.
 		fmt.Println("Provide the previous release version as a semver string, e.g. v1.2.3:")
@@ -82,6 +83,7 @@ func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastReleaseVersion, 
 		if err := h.input.SetReleaseVersions(new, old); err != nil {
 			return err
 		}
+		return nil
 	}
 	return errors.New("bad input where y/n was expected, exiting")
 }

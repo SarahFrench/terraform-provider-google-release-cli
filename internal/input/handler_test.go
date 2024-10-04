@@ -104,3 +104,76 @@ func Test_Handler_PromptAndProcessCommitChoiceInput(t *testing.T) {
 		})
 	}
 }
+
+func Test_Handler_PromptAndProcessReleaseVersionChoiceInput(t *testing.T) {
+
+	suggestedLastVersion := "v3.1.4"
+	suggestedNextVersion := "v3.2.4"
+
+	cases := map[string]struct {
+		expectError                    bool
+		firstPromptAnswer              string
+		secondPromptAnswer             string
+		thirdPromptAnswer              string
+		expectedPreviousReleaseVersion string
+		expectedReleaseVersion         string
+	}{
+		"accepting suggested versions": {
+			firstPromptAnswer:              "y\n",
+			expectedPreviousReleaseVersion: suggestedLastVersion,
+			expectedReleaseVersion:         suggestedNextVersion,
+		},
+		"not accepting suggested versions, use provided values": {
+			firstPromptAnswer:              "n\n",
+			secondPromptAnswer:             "v9.9.0\n",
+			thirdPromptAnswer:              "v9.10.0\n",
+			expectedPreviousReleaseVersion: "v9.9.0",
+			expectedReleaseVersion:         "v9.10.0",
+		},
+		"error on bad y/n input": {
+			firstPromptAnswer: "foobar\n",
+			expectError:       true,
+		},
+		"not accepting suggested versions, get error on bad second input value": {
+			firstPromptAnswer:  "n\n",
+			secondPromptAnswer: "9.9.0\n", // no v
+			expectError:        true,
+		},
+		"not accepting suggested versions, get error on bad third input value": {
+			firstPromptAnswer:  "n\n",
+			secondPromptAnswer: "v9.9.0\n",
+			thirdPromptAnswer:  "9.10.0\n", // no v
+			expectError:        true,
+		},
+	}
+
+	for tn, tc := range cases {
+		t.Run(tn, func(t *testing.T) {
+			stdin := bytes.Buffer{}
+
+			userInput := tc.firstPromptAnswer + tc.secondPromptAnswer + tc.thirdPromptAnswer
+			stdin.Write([]byte(userInput))
+
+			input := Input{}
+			handler := NewHandler(&input)
+
+			r := bufio.NewReader(&stdin)
+			handler.reader = r
+
+			err := handler.PromptAndProcessReleaseVersionChoiceInput(suggestedLastVersion, suggestedNextVersion)
+			if err != nil && !tc.expectError {
+				t.Fatal(err.Error())
+			}
+			if err == nil && tc.expectError {
+				t.Fatal("expected error but got none")
+			}
+
+			if input.PreviousReleaseVersion != tc.expectedPreviousReleaseVersion {
+				t.Fatalf("wanted %s, got %s", tc.expectedPreviousReleaseVersion, input.PreviousReleaseVersion)
+			}
+			if input.ReleaseVersion != tc.expectedReleaseVersion {
+				t.Fatalf("wanted %s, got %s", tc.expectedReleaseVersion, input.ReleaseVersion)
+			}
+		})
+	}
+}
