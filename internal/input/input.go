@@ -13,6 +13,12 @@ const (
 	BETA
 )
 
+var providerToString = map[Provider]string{
+	UNSET: "UNSET",
+	GA:    "GA",
+	BETA:  "BETA",
+}
+
 var GA_REPO_NAME = "terraform-provider-google"
 var BETA_REPO_NAME = "terraform-provider-google-beta"
 
