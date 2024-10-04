@@ -17,6 +17,11 @@ type Config struct {
 	// RemoteOwner defaults to 'hashicorp' but can be set in config to enable using
 	// the CLI with a fork of the official HashiCorp repository.
 	RemoteOwner string `json:"remoteOwner"`
+
+	// GitHub token is a personal access token with no permissions
+	// It is used by changelog-gen
+	// https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token
+	GitHubToken string `json:githubToken`
 }
 
 type compositeValidationError []error

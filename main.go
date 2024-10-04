@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 
+	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/changelog"
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/config"
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/git"
 	input_pkg "github.com/SarahFrench/terraform-provider-google-release-cli/internal/input"
@@ -17,14 +19,14 @@ var changelogExecutable string = "changelog-gen"
 func main() {
 
 	// Handle inputs via flags
-	// var githubToken string //TODO
+	var githubToken string
 	var commitShaFlag string
 	var releaseVersionFlag string
 	var previousReleaseVersionFlag string
 	var gaFlag bool
 	var betaFlag bool
 
-	// flag.StringVar(&githubToken, "gh_token", "", "Create a PAT with no permissions, see: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token")
+	flag.StringVar(&githubToken, "gh_token", "", "Create a PAT with no permissions, see: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token")
 	flag.StringVar(&commitShaFlag, "commit_sha", "", "The commit from the main branch that will be used for the release")
 	flag.StringVar(&releaseVersionFlag, "release_version", "", "The version that we're about to prepare, in format v4.XX.0")
 	flag.StringVar(&previousReleaseVersionFlag, "prev_release_version", "", "The previous version that was released, in format v4.XX.0")
@@ -104,6 +106,9 @@ func main() {
 	if err := input.Validate(); err != nil {
 		log.Fatal(fmt.Errorf("validation error raised after collecting user inputs: %w", err))
 	}
+	if githubToken == "" && c.GitHubToken == "" {
+		log.Fatal("no GitHub token provided: either add one to your config file or supply using a -gh_token flag")
+	}
 
 	// Prepare
 	dir := c.GetProviderDirectoryPath(input.GetProviderRepoName())
@@ -146,9 +151,41 @@ func main() {
 		log.Fatal(cmd.ErrorDescription("error when creating a new release branch"))
 	}
 
+	// This should be the same as input.CommitSha, but the release process includes running
+	// git rev-list -n 1 HEAD
+	lastCommitCurrentRelease, cmd, err := gi.GetLastCommitOfCurrentRelease(branchName)
+	if err != nil {
+		log.Fatal(cmd.ErrorDescription("error when getting last commit of current release"))
+	}
+
 	log.Printf("Release branch %s was created and pushed", branchName)
 
-	log.Printf("https://github.com/%s/%s/edit/release-%s/CHANGELOG.md", c.RemoteOwner, input.GetProviderRepoName(), input.ReleaseVersion)
+	log.Println("Creating CHANGELOG entry")
 
-	log.Println("Done!")
+	token := githubToken
+	if token == "" {
+		// Flag takes precedence over config
+		token = c.GitHubToken
+	}
+	os.Setenv("GITHUB_TOKEN", token)
+	defer os.Setenv("GITHUB_TOKEN", "")
+
+	// changelog-gen -repo $REPO_NAME -branch main -owner hashicorp -changelog ${MM_REPO}/.ci/changelog.tmpl -releasenote ${MM_REPO}/.ci/release-note.tmpl -no-note-label "changelog: no-release-note" $COMMIT_SHA_OF_LAST_RELEASE $COMMIT_SHA_OF_LAST_COMMIT_IN_CURRENT_RELEASE
+	cl := changelog.ChangeLogRun{
+		Input:                    input,
+		Config:                   c,
+		LastReleaseCommit:        lastReleaseCommit,
+		LastCommitCurrentRelease: lastCommitCurrentRelease,
+
+		Dir: dir,
+	}
+	cl.GenerateChangelog()
+	output := cl.String()
+
+	fmt.Print("\n---\n")
+	fmt.Printf("\n\033[32m" + output)
+	fmt.Print("\n---\n")
+
+	log.Printf("Copy the CHANGELOG above into : https://github.com/%s/%s/edit/release-%s/CHANGELOG.md", c.RemoteOwner, input.GetProviderRepoName(), input.ReleaseVersion)
+
 }
