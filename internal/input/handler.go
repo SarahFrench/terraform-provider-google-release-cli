@@ -47,9 +47,9 @@ func (h *Handler) PromptAndProcessProviderChoiceInput() error {
 	return nil
 }
 
-func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastRelaseVersion, possibleNextVersion string) error {
+func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastReleaseVersion, possibleNextVersion string) error {
 
-	fmt.Printf("The latest release of %s is %s\n", h.input.GetProviderRepoName(), lastRelaseVersion)
+	fmt.Printf("The latest release of %s is %s\n", h.input.GetProviderRepoName(), lastReleaseVersion)
 	fmt.Printf("Are you planning on making the next minor release, %s? (y/n)\n", possibleNextVersion)
 
 	in, err := h.WaitForResponse()
@@ -59,7 +59,7 @@ func (h *Handler) PromptAndProcessReleaseVersionChoiceInput(lastRelaseVersion, p
 
 	switch in {
 	case "y":
-		if err := h.input.SetReleaseVersions(possibleNextVersion, lastRelaseVersion); err != nil {
+		if err := h.input.SetReleaseVersions(possibleNextVersion, lastReleaseVersion); err != nil {
 			return err
 		}
 	case "n":
