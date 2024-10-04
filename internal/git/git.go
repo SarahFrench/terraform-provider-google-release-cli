@@ -86,6 +86,43 @@ func (c *GitInteract) Checkout(ref string) (GitCommand, error) {
 	return gc, nil
 }
 
+func (c *GitInteract) GetLastCommitOfCurrentRelease(branchName string) (string, GitCommand, error) {
+	gc := GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+
+	// Checkout commit
+	gc.cmd = exec.Command("git", "checkout", branchName)
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	if err := gc.cmd.Run(); err != nil {
+		gc.runErr = err
+		return "", gc, err
+	}
+
+	// Get last commit
+	gc = GitCommand{
+		stdout: &bytes.Buffer{},
+		stderr: &bytes.Buffer{},
+	}
+
+	gc.cmd = exec.Command("git", "rev-list", "-n", "1", "HEAD")
+	gc.cmd.Dir = c.Dir
+	gc.cmd.Stderr = gc.stderr
+	gc.cmd.Stdout = gc.stdout
+
+	if err := gc.cmd.Run(); err != nil {
+		gc.runErr = err
+		return "", gc, err
+	}
+
+	lastCommit := strings.ReplaceAll(gc.stdout.String(), "\n", "")
+	return lastCommit, gc, nil
+}
+
 func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string, GitCommand, error) {
 	gc := GitCommand{
 		stdout: &bytes.Buffer{},
