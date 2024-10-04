@@ -4,12 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/config"
 	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/git"
 	input_pkg "github.com/SarahFrench/terraform-provider-google-release-cli/internal/input"
+	"github.com/SarahFrench/terraform-provider-google-release-cli/internal/release_version"
 )
 
 var changelogExecutable string = "changelog-gen"
@@ -18,44 +18,97 @@ func main() {
 
 	// Handle inputs via flags
 	// var githubToken string //TODO
-	var commitSha string
-	var releaseVersion string
-	var previousReleaseVersion string
-	var ga bool
-	var beta bool
+	var commitShaFlag string
+	var releaseVersionFlag string
+	var previousReleaseVersionFlag string
+	var gaFlag bool
+	var betaFlag bool
 
 	// flag.StringVar(&githubToken, "gh_token", "", "Create a PAT with no permissions, see: https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token")
-	flag.StringVar(&commitSha, "commit_sha", "", "The commit from the main branch that will be used for the release")
-	flag.StringVar(&releaseVersion, "release_version", "", "The version that we're about to prepare, in format 4.XX.0")
-	flag.StringVar(&previousReleaseVersion, "previous_release_version", "", "The previous version that was released, in format 4.XX.0")
-	flag.BoolVar(&ga, "ga", false, "Flag to start creating a release for the GA provider")
-	flag.BoolVar(&beta, "beta", false, "Flag to start creating a release for the Beta provider")
+	flag.StringVar(&commitShaFlag, "commit_sha", "", "The commit from the main branch that will be used for the release")
+	flag.StringVar(&releaseVersionFlag, "release_version", "", "The version that we're about to prepare, in format v4.XX.0")
+	flag.StringVar(&previousReleaseVersionFlag, "prev_release_version", "", "The previous version that was released, in format v4.XX.0")
+	flag.BoolVar(&gaFlag, "ga", false, "Flag to start creating a release for the GA provider")
+	flag.BoolVar(&betaFlag, "beta", false, "Flag to start creating a release for the Beta provider")
 	flag.Parse()
-
-	input, err := input_pkg.New(ga, beta, commitSha, releaseVersion, previousReleaseVersion)
-	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
-	}
 
 	// Load in config
 	c, err := config.LoadConfigFromFile()
 	if err != nil {
-		fmt.Print(err.Error())
-		os.Exit(1)
+		log.Fatal(err.Error())
 	}
 
 	// Make sure dependencies present
 	_, err = exec.LookPath(changelogExecutable)
 	if err != nil {
 		log.Fatal("you need to have changelog-gen in your PATH to use this CLI. Ensure it is in your PATH or download it via: go install github.com/paultyng/changelog-gen@master")
-		os.Exit(1)
+	}
+
+	// Ready to collect input
+	input := input_pkg.Input{}
+	handler := input_pkg.NewHandler(&input)
+
+	// PROVIDER CHOICE
+	fmt.Println()
+	if gaFlag || betaFlag {
+		// Info provided by flags
+		fmt.Println("Provider choice set via flag:")
+		err := input.SetProviderFromFlags(gaFlag, betaFlag)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		fmt.Printf("\tMaking a release for %s\n", input.GetProviderRepoName())
+	} else {
+		// Need to get info via stdin
+		err = handler.PromptAndProcessProviderChoiceInput()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+	}
+
+	// RELEASE VERSION CHOICE
+	if releaseVersionFlag != "" || previousReleaseVersionFlag != "" {
+		// Info provided by flags
+		fmt.Println("Release version infomation provided by flags:")
+		fmt.Printf("\tPrevious release version: %s\n", previousReleaseVersionFlag)
+		fmt.Printf("\tNew release version: %s\n", releaseVersionFlag)
+	} else {
+
+		// Prepare info about the last release and proposed new minor release versions.
+		rq := release_version.New(c.RemoteOwner, input.GetProviderRepoName())
+		latestVersion, err := rq.GetLastVersionFromGitHub()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		proposedNextVersion, err := release_version.NextMinorVersion(latestVersion)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		// Need to get info via stdin
+		handler.PromptAndProcessReleaseVersionChoiceInput(latestVersion, proposedNextVersion)
+	}
+
+	// 'COMMIT TO CUT RELEASE ON' CHOICE
+	fmt.Println()
+	if commitShaFlag != "" {
+		// Info provided by flags
+		fmt.Printf("Release cut commit provided by flag: %s\n", commitShaFlag)
+		input.SetCommit(commitShaFlag)
+	} else {
+		// Need to get info via stdin
+		handler.PromptAndProcessCommitChoiceInput()
+	}
+
+	// Double check inputs from above
+	if err := input.Validate(); err != nil {
+		log.Fatal(fmt.Errorf("validation error raised after collecting user inputs: %w", err))
 	}
 
 	// Prepare
-	providerRepoName, _ := input.GetProviderRepoName()
+	dir := c.GetProviderDirectoryPath(input.GetProviderRepoName())
 	gi := git.GitInteract{
-		Dir:             providerRepoName,
+		Dir:             dir,
 		PreviousRelease: input.PreviousReleaseVersion,
 		Remote:          c.Remote,
 	}
@@ -67,11 +120,11 @@ func main() {
 	}
 
 	// Run commands to create the release branch
-	lastRelease, cmd, err := gi.GetLastReleaseCommit()
+	lastReleaseCommit, cmd, err := gi.GetLastReleaseCommit()
 	if err != nil {
 		log.Fatal(cmd.ErrorDescription("error when getting last release's commit"))
 	}
-	fmt.Println(lastRelease) // TODO remove when last release used in future code
+	fmt.Println(lastReleaseCommit) // TODO remove when used in future code
 
 	log.Print("Starting to create and push new release branch")
 
@@ -95,18 +148,7 @@ func main() {
 
 	log.Printf("Release branch %s was created and pushed", branchName)
 
-	log.Printf("https://github.com/hashicorp/%s/edit/release-%s/CHANGELOG.md", providerRepoName, input.ReleaseVersion)
+	log.Printf("https://github.com/%s/%s/edit/release-%s/CHANGELOG.md", c.RemoteOwner, input.GetProviderRepoName(), input.ReleaseVersion)
 
 	log.Println("Done!")
-}
-
-func assertPathExists(path string) error {
-	_, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("cannot find anything at the path '%s', is the path correct?", path)
-		}
-		return fmt.Errorf("unexpected error when locating %s", path)
-	}
-	return nil
 }

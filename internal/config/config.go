@@ -13,6 +13,10 @@ type Config struct {
 	GooglePath       string `json:"googlePath"`
 	GoogleBetaPath   string `json:"googleBetaPath"`
 	Remote           string `json:"remote"`
+
+	// RemoteOwner defaults to 'hashicorp' but can be set in config to enable using
+	// the CLI with a fork of the official HashiCorp repository.
+	RemoteOwner string `json:"remoteOwner"`
 }
 
 type compositeValidationError []error
@@ -30,6 +34,8 @@ func (ve compositeValidationError) Error() string {
 }
 
 var CONFIG_FILE_NAME = ".tpg-cli-config.json"
+var GA_REPO_NAME = "terraform-provider-google"
+var BETA_REPO_NAME = "terraform-provider-google-beta"
 
 func (c *Config) validate() error {
 
@@ -66,6 +72,10 @@ func (c *Config) validate() error {
 		errs = append(errs, errors.New("error in loaded config: remote is empty/missing"))
 	}
 
+	if c.RemoteOwner == "" {
+		errs = append(errs, errors.New("error in loaded config: remote repo owner is empty/missing"))
+	}
+
 	if len(errs) > 0 {
 		return errs
 	}
@@ -92,6 +102,9 @@ func LoadConfigFromFile() (*Config, error) {
 	if err = jsonParser.Decode(&config); err != nil {
 		return nil, append(errs, fmt.Errorf("error parsing config file: %w", err))
 	}
+	if config.RemoteOwner == "" {
+		config.RemoteOwner = "hashicorp"
+	}
 
 	err = config.validate()
 	if err != nil {
@@ -103,4 +116,15 @@ func LoadConfigFromFile() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func (c *Config) GetProviderDirectoryPath(provider string) string {
+	switch provider {
+	case GA_REPO_NAME:
+		return c.GoogleBetaPath
+	case BETA_REPO_NAME:
+		return c.GooglePath
+	default:
+		return fmt.Sprintf("no directory in config for provider %s", provider)
+	}
 }

@@ -87,6 +87,7 @@ func TestConfig_validate(t *testing.T) {
 
 	for tn, tc := range testCases {
 		t.Run(tn, func(t *testing.T) {
+			tc.config.RemoteOwner = "hashicorp" // this is the default, added when creating configs via constructor
 			err := tc.config.validate()
 			if err != nil {
 				if tc.expectError == false {
@@ -106,13 +107,15 @@ func TestConfig_LoadConfigFromFile(t *testing.T) {
 	// Arrange
 	tmpDir := os.TempDir()
 	remote := "origin"
+	owner := "sarahcorp"
 
 	json := fmt.Sprintf(`{
 	"magicModulesPath": "%s",
 	"googlePath": "%s",
 	"googleBetaPath": "%s",
-	"remote": "%s"
-}`, tmpDir, tmpDir, tmpDir, remote) // paths are all valid
+	"remote": "%s",
+	"remoteOwner": "%s"
+}`, tmpDir, tmpDir, tmpDir, remote, owner) // paths are all valid
 
 	// Make a test fixture that contains paths to existing directories
 	f, err := os.Create(tmpDir + CONFIG_FILE_NAME)
@@ -151,5 +154,8 @@ func TestConfig_LoadConfigFromFile(t *testing.T) {
 	}
 	if c.Remote != remote {
 		t.Fatalf("unexpected value of Remote, want %s, got %s", remote, c.Remote)
+	}
+	if c.RemoteOwner != owner {
+		t.Fatalf("unexpected value of RemoteOwner, want %s, got %s", owner, c.RemoteOwner)
 	}
 }

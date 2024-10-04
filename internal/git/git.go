@@ -30,17 +30,18 @@ func NewGitInteract(directory, previousRelease string) *GitInteract {
 }
 
 func (c *GitInteract) GetLastReleaseCommit() (string, GitCommand, error) {
+
+	// Get the common commit between the last release and the new release we're preparing
 	gc := GitCommand{
 		stdout: &bytes.Buffer{},
 		stderr: &bytes.Buffer{},
 	}
-	gc.cmd = exec.Command("git", "merge-base", "main", fmt.Sprintf("v%s", c.PreviousRelease))
+	gc.cmd = exec.Command("git", "merge-base", "main", c.PreviousRelease)
 	gc.cmd.Dir = c.Dir
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
@@ -59,8 +60,7 @@ func (c *GitInteract) PullTagsMainBranch() (GitCommand, error) {
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return gc, err
 	}
@@ -78,8 +78,7 @@ func (c *GitInteract) Checkout(ref string) (GitCommand, error) {
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return gc, err
 	}
@@ -93,7 +92,8 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 		stderr: &bytes.Buffer{},
 	}
 
-	branchName := fmt.Sprintf("release-%s", releaseVersion)
+	version := strings.TrimPrefix(releaseVersion, "v") // Remove prefix v1.2.3 => 1.2.3
+	branchName := fmt.Sprintf("release-%s", version)
 
 	// Create branch locally
 	gc.cmd = exec.Command("git", "checkout", "-b", branchName)
@@ -101,8 +101,7 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err := gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
@@ -117,8 +116,7 @@ func (c *GitInteract) CreateAndPushReleaseBranch(releaseVersion string) (string,
 	gc.cmd.Stderr = gc.stderr
 	gc.cmd.Stdout = gc.stdout
 
-	err = gc.cmd.Run()
-	if err != nil {
+	if err := gc.cmd.Run(); err != nil {
 		gc.runErr = err
 		return "", gc, err
 	}
